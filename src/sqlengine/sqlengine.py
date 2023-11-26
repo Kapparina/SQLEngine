@@ -24,7 +24,8 @@ class SQLEngine:
             self,
             driver: Optional[str],
             host: Optional[str],
-            database: Optional[str], query: Optional[dict[str, str]]
+            database: Optional[str], query: Optional[dict[str, str]],
+            **kwargs
     ) -> None:
         self.driver = driver
         self.host = host
@@ -35,7 +36,8 @@ class SQLEngine:
             drivername=self.driver,
             host=self.host,
             database=self.database,
-            query=self.query
+            query=self.query,
+            **kwargs
         )
 
         self.engine = create_engine(url=self.url)
@@ -141,7 +143,8 @@ def build_engine(
             database=database
         ).engine
 
-    elif local_db_filepath is not None:
+    elif driver == "access":
+        assert local_db_filepath is not None, "Using Access you must specify a local database file path."
         return AccessEngine(db_path=local_db_filepath).engine
 
     else:

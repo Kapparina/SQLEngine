@@ -1,6 +1,6 @@
 [project]
 name = "SQLEngine"
-version = "0.1.0"
+version = "1.0.0"
 description = "A simple wrapper enabling quick SQLAlchemy Engine creation for various DBMS."
 authors = [
     {name = "Kapparina", email = "116474667+Kapparina@users.noreply.github.com"},
