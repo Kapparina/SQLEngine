@@ -5,20 +5,22 @@ from sqlalchemy import Connection, Engine, URL, create_engine
 
 class SQLEngine:
     """
-    A class for creating and connecting to SQL engines.
+    A class representing a SQL engine for connecting to a database.
 
-    :param driver: Optional[str] - The driver for the SQL engine.
-    :param host: Optional[str] - The host address for the SQL engine.
-    :param database: Optional[str] - The name of the database to connect to.
-    :param query: Optional[dict[str, str]] - The additional query parameters to include in the connection URL.
+    Attributes:
+        driver (Optional[str]): The name of the database driver.
+        host (Optional[str]): The hostname or IP address of the database server.
+        database (Optional[str]): The name of the database.
+        query (Optional[dict[str, str]]): A dictionary of query parameters.
+        url (URL): The SQLAlchemy URL object representing the connection URL.
+        engine (Engine): The SQLAlchemy Engine object representing the database engine.
 
-    :ivar driver: Optional[str] - The driver for the SQL engine.
-    :ivar host: Optional[str] - The host address for the SQL engine.
-    :ivar database: Optional[str] - The name of the database to connect to.
-    :ivar query: Optional[dict[str, str]] - The additional query parameters to include in the connection URL.
-    :ivar url: URL - The connection URL for the SQL engine.
-    :ivar engine: Engine - The SQLAlchemy engine object.
+    Methods:
+        connect() -> Connection:
+            Connects to the database using the configured engine and returns a SQLAlchemy Connection object.
 
+    Note:
+        This class requires the SQLAlchemy library to be installed.
     """
     def __init__(
             self,
@@ -37,7 +39,7 @@ class SQLEngine:
             host=self.host,
             database=self.database,
             query=self.query,
-            **kwargs
+            **kwargs  # type: ignore
         )
 
         self.engine = create_engine(url=self.url)
@@ -48,52 +50,36 @@ class SQLEngine:
 
 class MSSQLEngine(SQLEngine):
     """
-    A class representing an MSSQL database engine.
-
-    The MSSQLEngine class inherits from the SQLEngine class
-    and provides the necessary functionality to connect
-    to an MSSQL database and execute SQL queries.
+    A class that represents a Microsoft SQL Server Engine.
 
     Attributes:
-        driver (str): The driver used for connecting to the database.
-        query (dict[str, str]): The additional query parameters to be used for connecting to the database.
+        driver (str): The driver to connect to the SQL Server (default: "mssql+pyodbc").
+        query (dict[str, str]): The query to connect to the SQL Server (default: {"driver": "SQL Server Native Client 11.0"})
 
     Methods:
-        __init__(self, host: str, database: str) -> None: Initializes a new instance of the MSSQLEngine class.
+        __init__(host: str, database: str, **kwargs) -> None: Initializes the MSSQLEngine instance with the given host, database, and additional **kwargs.
 
     """
     driver: str = "mssql+pyodbc"
     query: dict[str, str] = {"driver": "SQL Server Native Client 11.0"}
 
-    def __init__(self, host: str, database: str) -> None:
+    def __init__(self, host: str, database: str, **kwargs) -> None:
         super().__init__(
             driver=self.driver,
             host=host,
             database=database,
-            query=self.query
+            query=self.query,
+            **kwargs  # type: ignore
         )
 
 
 class AccessEngine(SQLEngine):
     """
-    AccessEngine class
-    ------------------
 
-    This class represents an AccessEngine that is used for accessing a Microsoft Access database using the pyodbc driver.
+    Module implementing the AccessEngine class.
 
-    Attributes:
-    -----------
-    - driver (str): The driver used for connecting to the Access database.
-    - query (dict[str, str]): The query parameters used for the connection.
-        - driver: The driver specification for the Access database.
-        - ExtendedAnsiSql: The setting for enabling extended ANSI SQL.
+    The AccessEngine class is a subclass of SQLEngine and provides methods to interact with a Microsoft Access database.
 
-    Methods:
-    --------
-    - __init__(self, db_path: str | Path) -> None:
-        Initializes the AccessEngine instance.
-        Parameters:
-            - db_path (str | Path): The path to the Access database.
     """
     driver: str = "access+pyodbc"
     query: dict[str, str] = {
@@ -101,13 +87,14 @@ class AccessEngine(SQLEngine):
         "ExtendedAnsiSql": "1"
     }
 
-    def __init__(self, db_path: str | Path) -> None:
+    def __init__(self, db_path: str | Path, **kwargs) -> None:
         self.query["DBQ"] = str(Path(db_path).absolute())
         super().__init__(
             driver=self.driver,
             host=None,
             database=None,
-            query=self.query
+            query=self.query,
+            **kwargs  # type: ignore
         )
 
 
@@ -116,44 +103,48 @@ def build_engine(
         host: str = None,
         database: str = None,
         query: dict[str, str] = None,
-        local_db_filepath: str | Path = None
+        local_db_filepath: str | Path = None,
+        **kwargs
 ) -> Engine:
     """
-    Build and return a database engine based on the provided configurations.
+    Args:
+        driver (str): The driver to use for the database connection.
+        host (str): The host address of the database server.
+        database (str): The name of the database to connect to.
+        query (dict[str, str]): A dictionary of query parameters for the database connection.
+        local_db_filepath (str | Path): The filepath of the local database file. Only required when using the 'access' driver.
+        **kwargs: Additional keyword arguments to pass to the engine.
 
-    :param driver: The database driver to use.
-    :type driver: str, optional
-    :param host: The host of the database.
-    :type host: str, optional
-    :param database: The name of the database.
-    :type database: str, optional
-    :param query: Additional query parameters for the database engine.
-    :type query: dict[str, str], optional
-    :param local_db_filepath: The filepath to a local database file.
-    :type local_db_filepath: str or Path, optional
-    :return: The instantiated database engine.
-    :rtype: Engine
-    :raises AssertionError: If neither driver nor local_db_filepath is provided.
+    Returns:
+        Engine: The SQLAlchemy engine object for the database connection.
+
+    Raises:
+        AssertionError: When neither driver nor local_db_filepath is specified.
+        Exception: If any exception occurs during the engine creation process.
     """
     assert driver is not None or local_db_filepath is not None, "Specify a driver or local database file path."
+    try:
+        if driver == "mssql":
+            return MSSQLEngine(
+                host=host,
+                database=database,
+                **kwargs  # type: ignore
+            ).engine
 
-    if driver == "mssql":
-        return MSSQLEngine(
-            host=host,
-            database=database
-        ).engine
+        elif driver == "access":
+            assert local_db_filepath is not None, "Using Access you must specify a local database file path."
+            return AccessEngine(
+                db_path=local_db_filepath,
+                **kwargs  # type: ignore
+            ).engine
 
-    elif driver == "access":
-        assert local_db_filepath is not None, "Using Access you must specify a local database file path."
-        return AccessEngine(db_path=local_db_filepath).engine
-
-    else:
-        try:
+        else:
             return SQLEngine(
                 driver=driver,
                 host=host,
                 database=database,
-                query=query
+                query=query,
+                **kwargs  # type: ignore
             ).engine
-        except Exception as e:
-            raise e
+    except Exception as e:
+        raise e
